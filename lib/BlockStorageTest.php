@@ -979,7 +979,12 @@ abstract class BlockStorageTest {
    * @return int
    */
   public static function getCpuCount() {
-    return trim(shell_exec('nproc'))*1;
+    if  (preg_match('/[Bb][Ss][Dd]/', shell_exec('uname -s'))) {
+	    return trim(shell_exec('sysctl -n hw.ncpu'))*1;
+    }
+    else {
+	    return trim(shell_exec('nproc'))*1;
+    }
   }
   
   /**
@@ -1094,12 +1099,15 @@ abstract class BlockStorageTest {
   public static function getFreeSpace($target, $bytes=FALSE, $verbose=FALSE) {
     $device = self::getDevice($target);
     
+    print_msg("test", $verbose, __FILE__, __LINE__);
     if ($device == $target) {
-      $pieces = explode("\n", trim(shell_exec($cmd = sprintf('lsblk -n -o size -b %s', $target))));
-      if (isset($pieces[0]) && is_numeric($pieces[0])) {
-        $freeSpace = $pieces[0]*1;
-        if (!$bytes) $freeSpace /= 1048576;
+      if (preg_match('/[Bb][Ss][Dd]/', shell_exec('uname -s'))) {
+        $freeSpace = shell_exec(($cmd = sprintf('diskinfo -v %s | grep bytes | cut -w -f 2', $target)))*1;
       }
+      else if (($pieces = explode("\n", trim(shell_exec($cmd = sprintf('lsblk -n -o size -b %s', $target))))) && isset($pieces[0]) && is_numeric($pieces[0])) {
+        $freeSpace = $pieces[0]*1;
+      }
+      if ($freeSpace && !$bytes) $freeSpace = round($freeSpace/1048576);
     }
     else {
       $df = self::df($target, array('B' => 'M'));
@@ -1114,7 +1122,6 @@ abstract class BlockStorageTest {
       $freeSpace = NULL;
       print_msg(sprintf('Unable to get free space for target %s', $target), $verbose, __FILE__, __LINE__, TRUE);
     }
-    
     return $freeSpace;
   }
   
@@ -1252,7 +1259,7 @@ abstract class BlockStorageTest {
       'fio' => 'fio',
       'fio_options' => array(
         'direct' => TRUE,
-        'ioengine' => 'libaio',
+        'ioengine' => preg_match('/[Bb][Ss][Dd]/', shell_exec('uname -s'))? 'posixaio':'libaio',
         'refill_buffers' => FALSE,
         'scramble_buffers' => TRUE
       ),
@@ -1581,16 +1588,26 @@ abstract class BlockStorageTest {
    */
   public static function isRotational($target) {
     $rotational = NULL;
-    
-    foreach(array(TRUE, FALSE) as $removeNumericSuffix) {
-      if (($device = self::getDevice($target, $removeNumericSuffix)) && 
-          file_exists($file = sprintf('/sys/block/%s/queue/rotational', basename($device)))) {
-        $rotational = trim(file_get_contents($file)) == '1';
-        break;
+    if  (preg_match('/[Bb][Ss][Dd]/', shell_exec('uname -s'))) {
+      $rpm = shell_exec($cmd = sprintf('diskinfo -v  %s |grep RPM |cut -w -f 2', $target));
+      if (!empty($rpm)) {
+	      $rotational = ($rpm != 0 ? TRUE: FALSE);
       }
+      else {
+        print_msg(sprintf('Unable to check if %s is rotational', isset($device) ? $device : $target), TRUE, __FILE__, __LINE__);
+      } 
     }
-    if ($rotational === NULL) print_msg(sprintf('Unable to check if %s is rotational because file %s does not exist', isset($device) ? $device : $target, isset($file) ? $file : 'NA'), TRUE, __FILE__, __LINE__);
+    else { 
+      foreach(array(TRUE, FALSE) as $removeNumericSuffix) {
+        if (($device = self::getDevice($target, $removeNumericSuffix)) && 
+            file_exists($file = sprintf('/sys/block/%s/queue/rotational', basename($device)))) {
+          $rotational = trim(file_get_contents($file)) == '1';
+          break;
+        }
     
+      }
+      if ($rotational === NULL) print_msg(sprintf('Unable to check if %s is rotational because file %s does not exist', isset($device) ? $device : $target, isset($file) ? $file : 'NA'), TRUE, __FILE__, __LINE__);
+    }
     return $rotational;
   }
   
@@ -1676,6 +1693,7 @@ abstract class BlockStorageTest {
     $purgeCount = 0;
     $nopurge = isset($this->options['nopurge']) && $this->options['nopurge'];
     $nopurgeIgnore = isset($this->options['nopurge_ignore']) && $this->options['nopurge_ignore'];
+    $nosanitize = FALSE;
     $nosecureerase = isset($this->options['nosecureerase']) && $this->options['nosecureerase'];
     $notrim = isset($this->options['notrim']) && $this->options['notrim'];
     $nozerofill = isset($this->options['nozerofill']) && $this->options['nozerofill'];
@@ -1691,6 +1709,7 @@ abstract class BlockStorageTest {
         $purged = FALSE;
         $volume = self::getVolume($target);
         $rotational = self::isRotational($target);
+        $bsd = (preg_match('/[Bb][Ss][Dd]/', shell_exec('uname -s')));
         print_msg(sprintf('Attempting to purge %srotational target %s with --nosecureerase=%d; --notrim=%d; --nozerofill=%d', $rotational ? '' : 'non-', $target, $nosecureerase ? '1' : '0', $notrim ? '1' : '0', $nozerofill ? '1' : '0'), $this->verbose, __FILE__, __LINE__);
         // try ATA secure erase
         if ($this->deviceTargets && !$nosecureerase) {
@@ -1720,10 +1739,24 @@ abstract class BlockStorageTest {
           }
         }
         else if (!$purged) print_msg(sprintf('TRIM not attempted for target %s because %s', $target, $notrim ? '--notrim argument was specified' : 'device is rotational'), $this->verbose, __FILE__, __LINE__);
+	
+	// next try sanitize 
+        if (!$purged && !$nosanitize && $bsd ) {
+          $cmd = sprintf("camcontrol sanitize %s -y -a block", $target);
+          print_msg(sprintf('Attempting Sanitize for volume %s using command %s', $volume, $cmd), $this->verbose, __FILE__, __LINE__);
+          $ecode = trim(exec($cmd));
+          if ($ecode > 0) print_msg(sprintf('Sanitize not supported or failed for target %s (exit code %d)', $target, $ecode), $this->verbose, __FILE__, __LINE__);
+          else {
+            print_msg(sprintf('Sanitize successful for target %s', $target), $this->verbose, __FILE__, __LINE__);
+            $this->purgeMethods[$target] = 'sanitize';
+            $purged = TRUE;
+          }
+        }
+        else if (!$purged) print_msg(sprintf('Sanitize not attempted for target %s because %s', $target, $nosanitize ? '--nosanitize argument was specified' : 'Not implemented on this OS'), $this->verbose, __FILE__, __LINE__);
         
         // finally try zero filling
         if (!$purged && !$nozerofill && (!$nozerofillNonRotational || $rotational)) {
-          $size = self::getFreeSpace($target);
+          $size = self::getFreeSpace($target,$bytes=TRUE);
           
           // adjust for active range and volume target free space buffer
           if ($this->options['active_range'] < 100) $size *= ($this->options['active_range'] * 0.01);
@@ -1735,6 +1768,7 @@ abstract class BlockStorageTest {
             print_msg(sprintf('Attempting to zero fill target %s with %d MB. This may take a while...', $target, $size), $this->verbose, __FILE__, __LINE__);
             $cmd = sprintf('dd if=/dev/zero of=%s bs=1M count=%d >/dev/null 2>&1; echo $?', $file = $target . ($this->volumeTargets ? '/'. self::BLOCK_STORAGE_TEST_FILE_NAME : ''), $size);
             $ecode = trim(exec($cmd));
+            print_msg( sprintf('dd if=/dev/zero of=%s bs=1M count=%d >/dev/null 2>&1; echo $?', $file = $target . ($this->volumeTargets ? '/'. self::BLOCK_STORAGE_TEST_FILE_NAME : ''), $size), __FILE__, __LINE__);
             // delete zero file from volume type targets
             if ($this->volumeTargets) {
               print_msg(sprintf('Removing temporary zero fill file %s', $file), $this->verbose, __FILE__, __LINE__);
@@ -1844,7 +1878,7 @@ abstract class BlockStorageTest {
    */
   public static function validateFio($options) {
     $fio = trim(shell_exec($options['fio'] . ' --version 2>&1'));
-    return preg_match('/^fio\-2\.[1-9]/', $fio) || preg_match('/^2\.[1-9]/', $fio) ? TRUE : FALSE;
+    return preg_match('/^f?i?o?\-?[0-1]\./', $fio) ||  preg_match('/^f?i?o?\-?2\.0/', $fio)? FALSE: TRUE;
   }
   
   /**

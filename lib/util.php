@@ -607,44 +607,58 @@ function get_sum_squares($points, $round=4) {
 function get_sys_info() {
   global $sys_info;
   if (!is_array($sys_info)) {
-    $sys_info = array();
-		if ($lines = explode("\n", file_get_contents('/proc/cpuinfo'))) {
-			foreach($lines as $line) {
-				if (preg_match('/(.*):(.*)/', trim($line), $m)) {
-					$key = trim($m[1]);
-					$val = preg_replace('/\s+/', ' ', trim($m[2]));
-					foreach(array('cores' => 'processor', 
-												'name' => 'model name',
-												'speed' => 'mhz',
-												'cache' => 'cache size') as $k => $match) {
-						if ($k == 'name') $val = str_replace('@ ', '', str_replace('CPU ', '', str_replace('Quad-Core ', '', str_replace('Processor ', '', str_replace('(tm)', '', str_replace('(R)', '', $val))))));
-						if (preg_match("/$match/i", $key)) $sys_info[sprintf('cpu%s', $k != 'name' ? '_' . $k : '')] = $k == 'cores' ? $val + 1 : $val;
+	$sys_info = array();
+	if  (preg_match('/[Bb][Ss][Dd]/', shell_exec('uname -s'))) {
+		$sysinfo['cpu'] = shell_exec("sysctl -n hw.model");
+		$sysinfo['cpu_cache'] = 0;
+		$sysinfo['cpu_cores'] = shell_exec("sysctl -n hw.ncpu");
+		$sysinfo['cpu_speed'] = shell_exec("sysctl -n dev.cpu.0.freq");
+		$sys_info['hostname'] = trim(shell_exec('hostname'));
+		$memkb = shell_exec("sysctl -n hw.physmem");
+		$sys_info['memory_mb'] = round($memkb/1024/1024);
+		$sys_info['memory_gb'] = round($memkb/1024/1024/1024);
+		$sys_info['os_info'] = shell_exec("uname -vUKi");
+        }
+	else {
+
+			if ($lines = explode("\n", file_get_contents('/proc/cpuinfo'))) {
+				foreach($lines as $line) {
+					if (preg_match('/(.*):(.*)/', trim($line), $m)) {
+						$key = trim($m[1]);
+						$val = preg_replace('/\s+/', ' ', trim($m[2]));
+						foreach(array('cores' => 'processor', 
+													'name' => 'model name',
+													'speed' => 'mhz',
+													'cache' => 'cache size') as $k => $match) {
+							if ($k == 'name') $val = str_replace('@ ', '', str_replace('CPU ', '', str_replace('Quad-Core ', '', str_replace('Processor ', '', str_replace('(tm)', '', str_replace('(R)', '', $val))))));
+							if (preg_match("/$match/i", $key)) $sys_info[sprintf('cpu%s', $k != 'name' ? '_' . $k : '')] = $k == 'cores' ? $val + 1 : $val;
+						}
 					}
 				}
 			}
-		}
-		$sys_info['hostname'] = trim(shell_exec('hostname'));
-		if (preg_match('/Mem:\s+([0-9]+)\s+([0-9]+)\s+([0-9]+)/', shell_exec('free -m'), $m)) {
-      $mb = $m[1]*1;
-      $sys_info['memory_mb'] = round($m[1]);
-      $sys_info['memory_gb'] = round($m[1]/1024);
-		}
-		$issue = file_get_contents('/etc/issue');
-		foreach(explode("\n", $issue) as $line) {
-			if (!isset($attr) && trim($line)) {
-			  $attr = trim($line);
-			  break;
-		  }
-		}
-		// remove superfluous information
-		if ($attr) {
-			$attr = str_replace('(\l).', '', $attr);
-			$attr = str_replace('\n', '', $attr);
-			$attr = str_replace('\l', '', $attr);
-			$attr = str_replace('\r', '', $attr);
-			$attr = str_replace('Welcome to', '', $attr);
-			$sys_info['os_info'] = trim($attr);
-		}
+			$sys_info['hostname'] = trim(shell_exec('hostname'));
+			if (preg_match('/Mem:\s+([0-9]+)\s+([0-9]+)\s+([0-9]+)/', shell_exec('free -m'), $m)) {
+				$mb = $m[1]*1;
+				$sys_info['memory_mb'] = round($m[1]);
+				$sys_info['memory_gb'] = round($m[1]/1024);
+			}
+			$issue = file_get_contents('/etc/issue');
+			foreach(explode("\n", $issue) as $line) {
+				if (!isset($attr) && trim($line)) {
+				  $attr = trim($line);
+				  break;
+			  }
+			}
+			// remove superfluous information
+			if ($attr) {
+				$attr = str_replace('(\l).', '', $attr);
+				$attr = str_replace('\n', '', $attr);
+				$attr = str_replace('\l', '', $attr);
+				$attr = str_replace('\r', '', $attr);
+				$attr = str_replace('Welcome to', '', $attr);
+				$sys_info['os_info'] = trim($attr);
+			}
+	}
   }
   return $sys_info;
 }

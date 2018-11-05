@@ -508,7 +508,8 @@ EXIT CODES:
 
 EOF
   exit
-elif [ -f "/usr/bin/php" ]; then
+  which php 2>&1 > /dev/null
+elif which -s  php ; then
   $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/lib/run.php $@
   exit $?
 else
