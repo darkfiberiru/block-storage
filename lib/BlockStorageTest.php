@@ -1729,7 +1729,12 @@ abstract class BlockStorageTest {
         // next try TRIM
         // if (!$purged && !$rotational && !$notrim) {
         if (!$purged && !$notrim) {
-          $cmd = sprintf(($this->deviceTargets ? 'blkdiscard' : 'fstrim') . '%s %s >/dev/null 2>&1; echo $?', $this->deviceTargets && isset($this->options['trim_offset_end']) && $this->options['trim_offset_end'] > 0 ? sprintf(' -o 0 -l %d', self::getFreeSpace($target, TRUE) - $this->options['trim_offset_end']) : '', $this->deviceTargets ? $target : $volume);
+          if ($this->deviceTargets) {
+             $cmd =  sprintf('fio --name=trim --bs=10g --rw=trim %s --filename %s >/dev/null 2>&1; echo $?', false && $this->deviceTargets && isset($this->options['trim_offset_end']) && $this->options['trim_offset_end'] > 0 ? sprintf(' -o 0 -l %d', self::getFreeSpace($target, TRUE) - $this->options['trim_offset_end']) : '', $this->deviceTargets ? $target : $volume);
+          }        
+          else {
+             $cmd = sprintf('fstrim %s %s >/dev/null 2>&1; echo $?', $this->deviceTargets && isset($this->options['trim_offset_end']) && $this->options['trim_offset_end'] > 0 ? sprintf(' -o 0 -l %d', self::getFreeSpace($target, TRUE) - $this->options['trim_offset_end']) : '', $this->deviceTargets ? $target : $volume);
+          }
           print_msg(sprintf('Attempting TRIM for volume %s using command %s', $volume, $cmd), $this->verbose, __FILE__, __LINE__);
           $ecode = trim(exec($cmd));
           if ($ecode > 0) print_msg(sprintf('TRIM not supported or failed for target %s (exit code %d)', $target, $ecode), $this->verbose, __FILE__, __LINE__);
