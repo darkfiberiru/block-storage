@@ -1870,7 +1870,6 @@ abstract class BlockStorageTest {
           break;
         }
       }
-      if (!$nonrotational) $dependencies['fstrim'] = 'util-linux';
     }
     return validate_dependencies($dependencies);
   }
