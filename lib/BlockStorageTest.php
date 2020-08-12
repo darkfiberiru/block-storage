@@ -949,7 +949,7 @@ abstract class BlockStorageTest {
         exec(sprintf('cd %s; zip %s *; mv %s %s', $tdir, basename($zip), basename($zip), $dir));
         if (!isset($options['nopdfreport']) || !$options['nopdfreport']) {
           // generate PDF report
-          $cmd = sprintf('cd %s; %swkhtmltopdf -s Letter --footer-left [date] --footer-right [page] --footer-font-name rfont --footer-font-size %d index.html report.pdf >/dev/null 2>&1; echo $?', $tdir, isset($options['wkhtml_xvfb']) ? 'xvfb-run ' : '', $options['font_size']);
+          $cmd = sprintf('cd %s; %swkhtmltopdf --enable-local-file-access -s Letter --footer-left [date] --footer-right [page] --footer-font-name rfont --footer-font-size %d index.html report.pdf >/dev/null 2>&1; echo $?', $tdir, isset($options['wkhtml_xvfb']) ? 'xvfb-run ' : '', $options['font_size']);
           $ecode = trim(exec($cmd));
           sleep(1);
           if ($ecode > 0) print_msg(sprintf('Failed to create PDF report'), $verbose, __FILE__, __LINE__, TRUE);
