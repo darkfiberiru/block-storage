@@ -350,12 +350,18 @@ class BlockStorageTestLatency extends BlockStorageTest {
   private function getLatency($job, $type='mean') {
     $latency = NULL;
     if (isset($job['write']) || isset($job['read'])) {
-      // both read and write - return mean of the two
-      if (isset($job['write']['lat'][$type]) && $job['write']['lat'][$type] > 0 && isset($job['read']['lat'][$type]) && $job['read']['lat'][$type] > 0) $latency = ($job['write']['lat'][$type] + $job['read']['lat'][$type])/2;
-      else if (isset($job['write']['lat'][$type]) && $job['write']['lat'][$type] > 0) $latency = $job['write']['lat'][$type];
-      else if (isset($job['read']['lat'][$type]) && $job['read']['lat'][$type] > 0) $latency = $job['read']['lat'][$type];
-      // convert from microseconds to milliseconds
-      if ($latency) $latency = round($latency/1000, self::BLOCK_STORAGE_TEST_LATENCY_ROUND_PRECISION);
+      foreach(array('lat', 'lat_ns') as $key) {
+        if (isset($job['write'][$key]) || isset($job['read'][$key])) {
+          // both read and write - return mean of the two
+          if (isset($job['write'][$key][$type]) && $job['write'][$key][$type] > 0 && isset($job['read'][$key][$type]) && $job['read'][$key][$type] > 0) $latency = ($job['write'][$key][$type] + $job['read'][$key][$type])/2;
+          else if (isset($job['write'][$key][$type]) && $job['write'][$key][$type] > 0) $latency = $job['write'][$key][$type];
+          else if (isset($job['read'][$key][$type]) && $job['read'][$key][$type] > 0) $latency = $job['read'][$key][$type];
+          // convert from microseconds to milliseconds
+          if ($latency && $key == 'lat') $latency = round($latency/1000, self::BLOCK_STORAGE_TEST_LATENCY_ROUND_PRECISION);
+          // convert from nanoseconds to milliseconds
+          else if ($latency && $key == 'lat_ns') $latency = round($latency/1000000, self::BLOCK_STORAGE_TEST_LATENCY_ROUND_PRECISION);
+        }
+      }
     }
     return $latency;
   }
