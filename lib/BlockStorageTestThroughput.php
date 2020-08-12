@@ -39,7 +39,7 @@ class BlockStorageTestThroughput extends BlockStorageTest {
       foreach(array('1024k', '128k') as $bs) {
         if (!isset($options['skip_blocksize']) || !in_array($bs, $options['skip_blocksize'])) {
           $this->subtests[$bs] = new BlockStorageTestThroughput($options, $bs);
-          $this->subtests[$bs]->purgeAndPrecondition = count($this->subtests[$bs]) > 1;
+          $this->subtests[$bs]->purgeAndPrecondition = count($this->subtests) > 1;
           $this->subtests[$bs]->test = 'throughput';
           $this->subtests[$bs]->verbose = isset($options['verbose']) && $options['verbose'];
           $this->subtests[$bs]->controller =& $this;

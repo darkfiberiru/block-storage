@@ -137,6 +137,10 @@ ARGUMENTS:
                             to. Added to saved results. May also be specified 
                             using the environment variable 
                             bm_provider_id
+                            
+--meta_pthroughput          Optional argument designating the amount of 
+                            provisioned throughput (MBps) associated with the 
+                            test volumes
 
 --meta_region               The compute service region this test pertains to. 
                             Used for report headers. May also be specified 
@@ -507,12 +511,13 @@ EXIT CODES:
   1 block storage testing failed
 
 EOF
-  exit
-  which php 2>&1 > /dev/null
-elif which -s  php ; then
-  $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/lib/run.php $@
-  exit $?
+    exit 0
+fi
+
+if [ "$(command -v php)" ];  then
+    $(cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/lib/run.php $@
+    exit $?
 else
-  echo "Error: missing dependency php-cli (/usr/bin/php)"
-  exit 1
+    echo "Error: missing dependency php-cli (/usr/bin/php)"
+    exit 1
 fi
