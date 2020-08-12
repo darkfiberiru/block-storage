@@ -76,6 +76,12 @@ class BenchmarkDb {
   protected $writeCsv = TRUE;
   
   /**
+   * if set to TRUE by implementing classes, then quotes will be stripped
+   * from CSV values and any commas in values wil be replaced with a pipe
+   */
+  protected $stripCsvQuotes = FALSE;
+  
+  /**
    * Constructor is protected to implement the singleton pattern using 
    * the BenchmarkDb::getDb static method
    * @param array $options db command line arguments
@@ -139,7 +145,7 @@ class BenchmarkDb {
                                 'db_librato_sum_squares:', 'db_librato_type:',
                                 'db_librato_value:',
                                 'db_mysql_engine:', 'db_name:', 
-                                'db_port:', 'db_pswd:', 'db_prefix:', 
+                                'db_port:', 'db_pswd:', 'db_prefix:', 'db_store_path:',
                                 'db_suffix:', 'db_user:', 'output:', 'params_file:', 
                                 'remove:', 'skip_validations', 'store:', 'v' => 'verbose'), 
                           $aparams = array('db_librato_aggregate', 
@@ -204,6 +210,9 @@ class BenchmarkDb {
           break;
         case 'postgresql':
           $impl .= 'PostgreSql';
+          break;
+        case 'store':
+          $impl .= 'Store';
           break;
         default:
           $err = '--db ' . $options['db'] . ' is not valid';
@@ -332,7 +341,8 @@ class BenchmarkDb {
         foreach($this->rows[$table] as $row) {
           foreach(array_keys($schema) as $i => $col) {
             if ($schema[$col]['type'] != 'index') {
-              fwrite($fp, sprintf('%s%s', $i > 0 ? ',' : '', isset($row[$col]) ? (strpos($row[$col], ',') ? '"' . str_replace('"', '\"', $row[$col]) . '"' : $row[$col]) : ''));
+			  if ($this->stripCsvQuotes && isset($row[$col]) && is_string($row[$col]) && strpos($row[$col], ',') !== FALSE) $row[$col] = str_replace(',', '|', $row[$col]);
+              fwrite($fp, sprintf('%s%s', $i > 0 ? ',' : '', isset($row[$col]) ? (strpos($row[$col], ',') !== FALSE ? '"' . str_replace('"', '\"', $row[$col]) . '"' : $row[$col]) : ''));
             }
           }
           fwrite($fp, "\n");
@@ -423,7 +433,7 @@ class BenchmarkDb {
       else {
         print_msg(sprintf('Set output directory to %s', $dir), isset($this->options['verbose']), __FILE__, __LINE__);
         $this->valid = TRUE;
-      } 
+      }
     }
     return $this->valid;
   }
@@ -450,13 +460,19 @@ class BenchmarkDb {
         case 'postgresql':
           $dependencies['psql'] = 'postgresql';
           break;
+        case 'store':
+          break;
         default:
-          $err = '--db ' . $options['db'] . ' is not valid';
+          $err = '--db ' . $this->options['db'] . ' is not valid';
           break;
       }
     }
     if ($this->archiver) $dependencies['curl'] = 'curl';
     
+    // invalid --db argument
+    if (isset($err)) {
+      print_msg($err, isset($this->options['verbose']), __FILE__, __LINE__, TRUE);
+    }
     if ($dependencies = validate_dependencies($dependencies)) {
       foreach($dependencies as $dependency) print_msg(sprintf('Missing dependence %s', $dependency), isset($this->options['verbose']), __FILE__, __LINE__, TRUE);
     }

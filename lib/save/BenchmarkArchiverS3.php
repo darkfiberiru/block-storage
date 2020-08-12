@@ -108,21 +108,30 @@ class BenchmarkArchiverS3 extends BenchmarkArchiver {
   /**
    * saves a file and returns the URL. returns NULL on error
    * @param string $file local path to the file that should be saved
+   * @param string $object optional explicit object path
+   * @param boolean $public whether or not to make the object public
    * @return string
    */
-  public function save($file) {
-    $object = $this->getObjectUri($file);
+  public function save($file, $object=NULL, $public=TRUE) {
+    $object = $object ? $object : $this->getObjectUri($file);
     $url = $this->getUrl($object);
     $headers = array();
     $headers['Content-Length'] = filesize($file);
     $headers['Content-Type'] = get_mime_type($file);
-    if (isset($this->options['store_public'])) $headers['x-amz-acl'] = 'public-read';
+    if (isset($this->options['store_public']) && $public) $headers['x-amz-acl'] = 'public-read';
     $headers = $this->getHeaders('PUT', $headers, $object);
     $curl = ch_curl($url, 'PUT', $headers, $file, NULL, 200);
-    if ($curl === 200) print_msg(sprintf('Upload of file %s to S3 successful. URL is %s (%s)', $file, $url, isset($this->options['store_public']) ? 'URL is publicly accessible' : 'URL is private'), isset($this->options['verbose']), __FILE__, __LINE__);
+    if ($curl === 200) {
+      print_msg(sprintf('Upload of file %s to S3 successful. URL is %s (%s)', $file, $url, isset($this->options['store_public']) && $public ? 'URL is publicly accessible' : 'URL is private'), isset($this->options['verbose']), __FILE__, __LINE__);
+    }
     else {
       $url = NULL;
       print_msg(sprintf('Upload of file %s to S3 failed', $file), isset($this->options['verbose']), __FILE__, __LINE__, TRUE);
+    }
+    // Use DNS style path
+    if ($url && $public && preg_match('/^(https?:\/\/)([^\/]+)\/([^\/]+)\//', $url, $m)) {
+      $url = str_replace($m[0], sprintf('%s%s.%s/', $m[1], $m[3], $m[2]), $url);
+      print_msg(sprintf('Returning DNS URL %s', $url), isset($this->options['verbose']), __FILE__, __LINE__);
     }
     return $url;
   }
