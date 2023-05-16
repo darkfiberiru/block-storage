@@ -1006,7 +1006,7 @@ abstract class BlockStorageTest {
     }
     if ($device && $removeNumericSuffix && preg_match('/[a-z]([0-9]+)$/', $device, $m)) $device = substr($device, 0, strlen($m[1])*-1);
     
-    return $device;
+    return realpath($device);
   }
   
   /**

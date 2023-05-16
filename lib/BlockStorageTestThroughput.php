@@ -231,7 +231,7 @@ class BlockStorageTestThroughput extends BlockStorageTest {
       return array(
         'AR Segments' => 'N/A',
         'Pre Condition 1' => $this->wipc ? 'SEQ 128K W' : 'None',
-        '&nbsp;&nbsp;TOIO - TC/QD' => $this->wipc ? sprintf('TC %d/QD %d', count($this->options['target']), $this->options['oio_per_thread']) : 'N/A',
+        '&nbsp;&nbsp;TOIO - TC/QD' => $this->wipc ? sprintf('TC %d/QD %d', $this->options['threads_total'], $this->options['oio_per_thread']) : 'N/A',
         '&nbsp;&nbsp;Duration' => $this->wipc ? sprintf('%dX %s Capacity%s', $this->options['precondition_passes'], $this->deviceTargets ? 'Device' : 'Volume', $this->options['active_range'] < 100 ? ' (' . $this->options['active_range'] . '% AR)' : '') : 'N/A',
         'Pre Condition 2' => isset($this->subtests['128k']) ? 'SEQ 128K W' : 'None',
         '&nbsp;&nbsp;TOIO - TC/QD ' => isset($this->subtests['128k']) ? sprintf('TC %d/QD %d', count($this->options['target']), $this->options['oio_per_thread']) : '',
@@ -285,10 +285,10 @@ class BlockStorageTestThroughput extends BlockStorageTest {
         'Test Stimulus 1' => isset($this->subtests['1024k']) ? 'SEQ 1024KiB' : 'None',
         '&nbsp;&nbsp;RW Mix' => isset($this->subtests['1024k']) ? '100:0 / 0:100' : '',
         '&nbsp;&nbsp;Block Sizes' => isset($this->subtests['1024k']) ? 'SEQ 1024KiB' : '',
-        '&nbsp;&nbsp;TOIO - TC/QD' => isset($this->subtests['1024k']) ? sprintf('TC %d/QD %d', count($this->options['target']), $this->options['oio_per_thread']) : '',
+        '&nbsp;&nbsp;TOIO - TC/QD' => isset($this->subtests['1024k']) ? sprintf('TC %d/QD %d', $this->options['threads_total'], $this->options['oio_per_thread']) : '',
         '&nbsp;&nbsp;Steady State' => isset($this->subtests['1024k']) && $this->subtests['1024k']->wdpc !== NULL ? sprintf('%d - %d%s', $this->subtests['1024k']->wdpcComplete - 4, $this->subtests['1024k']->wdpcComplete, $this->subtests['1024k']->wdpc ? '' : ' (NOT ACHIEVED)') : 'N/A',
         'Test Stimulus 2' => isset($this->subtests['128k']) ? 'SEQ 128KiB' : 'None',
-        '&nbsp;&nbsp;TOIO - TC/QD ' => isset($this->subtests['128k']) ? sprintf('TC %d/QD %d', count($this->options['target']), $this->options['oio_per_thread']) : '',
+        '&nbsp;&nbsp;TOIO - TC/QD ' => isset($this->subtests['128k']) ? sprintf('TC %d/QD %d', $this->options['threads_total'], $this->options['oio_per_thread']) : '',
         '&nbsp;&nbsp;Steady State ' => isset($this->subtests['128k']) && $this->subtests['128k']->wdpc !== NULL ? sprintf('%d - %d%s', $this->subtests['128k']->wdpcComplete - 4, $this->subtests['128k']->wdpcComplete, $this->subtests['128k']->wdpc ? '' : ' (NOT ACHIEVED)') : 'N/A'
       );
     }
@@ -346,7 +346,7 @@ class BlockStorageTestThroughput extends BlockStorageTest {
         foreach($workloads as $rw) {
           $name = sprintf('x%d-%s-%s-seq', $x, str_replace('/', '_', $rw), $bs);
           print_msg(sprintf('Executing sequential THROUGHPUT test iteration for round %d of %d, workload %s and block size %s', $x, $max, $rw, $bs), $this->verbose, __FILE__, __LINE__);
-          $options = array('blocksize' => $bs, 'name' => $name, 'numjobs' => 1, 'runtime' => $this->options['wd_test_duration'], 'rw' => $rw == '100/0' ? 'read' : 'write', 'time_based' => FALSE);
+          $options = array('blocksize' => $bs, 'name' => $name, 'numjobs' => $this->options['threads'], 'runtime' => $this->options['wd_test_duration'], 'rw' => $rw == '100/0' ? 'read' : 'write', 'time_based' => FALSE);
           if ($fio = $this->fio($options, 'wdpc')) {
             print_msg(sprintf('Sequential THROUGHPUT test iteration for round %d of %d, workload %s and block size %s was successful', $x, $max, $rw, $bs), $this->verbose, __FILE__, __LINE__);
             $results = $this->fio['wdpc'][count($this->fio['wdpc']) - 1];
