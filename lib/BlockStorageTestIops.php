@@ -23,7 +23,7 @@ class BlockStorageTestIops extends BlockStorageTest {
    * the BlockStorageTest::getTestController static method
    * @param array $options the test options
    */
-  protected function BlockStorageTestIops($options) {}
+  protected function __construct($options) {}
     
   /**
    * this sub-class method should return the content associated with $section 

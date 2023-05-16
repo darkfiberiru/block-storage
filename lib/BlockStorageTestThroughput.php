@@ -34,7 +34,7 @@ class BlockStorageTestThroughput extends BlockStorageTest {
    * the BlockStorageTest::getTestController static method
    * @param array $options the test options
    */
-  protected function BlockStorageTestThroughput($options, $bs=NULL) {
+  protected function __construct($options, $bs=NULL) {
     if ($bs === NULL) {
       foreach(array('1024k', '128k') as $bs) {
         if (!isset($options['skip_blocksize']) || !in_array($bs, $options['skip_blocksize'])) {

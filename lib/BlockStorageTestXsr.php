@@ -23,7 +23,7 @@ class BlockStorageTestXsr extends BlockStorageTest {
    * the BlockStorageTest::getTestController static method
    * @param array $options the test options
    */
-  protected function BlockStorageTestXsr($options) {}
+  protected function __construct($options) {}
     
   /**
    * Performs workload dependent preconditioning - this method must be 

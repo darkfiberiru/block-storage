@@ -23,7 +23,7 @@ class BlockStorageTestEcw extends BlockStorageTest {
    * the BlockStorageTest::getTestController static method
    * @param array $options the test options
    */
-  protected function BlockStorageTestEcw($options) {}
+  protected function __construct($options) {}
     
   /**
    * Performs workload dependent preconditioning - this method must be 

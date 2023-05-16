@@ -39,7 +39,7 @@ class BlockStorageTestHir extends BlockStorageTest {
    * the BlockStorageTest::getTestController static method
    * @param array $options the test options
    */
-  protected function BlockStorageTestHir($options) {
+  protected function __construct($options) {
     $this->skipWipc = TRUE;
   }
   
