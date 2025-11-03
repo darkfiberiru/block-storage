@@ -508,10 +508,10 @@ EXIT CODES:
 
 EOF
   exit
-elif [ -f "/usr/bin/php" ]; then
+elif which php > /dev/null 2>&1; then
   $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/lib/run.php $@
   exit $?
 else
-  echo "Error: missing dependency php-cli (/usr/bin/php)"
+  echo "Error: missing dependency php-cli"
   exit 1
 fi

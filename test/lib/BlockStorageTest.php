@@ -63,42 +63,55 @@ function get_sys_info($report_folder) {
     global $sys_info;
     if (!is_array($sys_info)) {
         $sys_info = array();
-        if ($lines = explode("\n", file_get_contents('/proc/cpuinfo'))) {
-            foreach($lines as $line) {
-                if (preg_match('/(.*):(.*)/', trim($line), $m)) {
-                    $key = trim($m[1]);
-                    $val = preg_replace('/\s+/', ' ', trim($m[2]));
-                    foreach(array('cores' => 'processor',
-                        'name' => 'model name',
-                        'speed' => 'mhz',
-                        'cache' => 'cache size') as $k => $match) {
-                        if ($k == 'name') $val = str_replace('@ ', '', str_replace('CPU ', '', str_replace('Quad-Core ', '', str_replace('Processor ', '', str_replace('(tm)', '', str_replace('(R)', '', $val))))));
-                        if (preg_match("/$match/i", $key)) $sys_info[sprintf('cpu%s', $k != 'name' ? '_' . $k : '')] = $k == 'cores' ? $val + 1 : $val;
+        if (preg_match('/[Bb][Ss][Dd]/', shell_exec('uname -s'))) {
+            $sys_info['cpu'] = trim(shell_exec("sysctl -n hw.model"));
+            $sys_info['cpu_cache'] = 0;
+            $sys_info['cpu_cores'] = trim(shell_exec("sysctl -n hw.ncpu"));
+            $sys_info['cpu_speed'] = trim(shell_exec("sysctl -n dev.cpu.0.freq"));
+            $sys_info['hostname'] = trim(shell_exec('hostname'));
+            $memkb = trim(shell_exec("sysctl -n hw.physmem"));
+            $sys_info['memory_mb'] = round($memkb/1024/1024);
+            $sys_info['memory_gb'] = round($memkb/1024/1024/1024);
+            $sys_info['os_info'] = trim(shell_exec("uname -vUKi"));
+        }
+        else {
+            if ($lines = explode("\n", file_get_contents('/proc/cpuinfo'))) {
+                foreach($lines as $line) {
+                    if (preg_match('/(.*):(.*)/', trim($line), $m)) {
+                        $key = trim($m[1]);
+                        $val = preg_replace('/\s+/', ' ', trim($m[2]));
+                        foreach(array('cores' => 'processor',
+                            'name' => 'model name',
+                            'speed' => 'mhz',
+                            'cache' => 'cache size') as $k => $match) {
+                            if ($k == 'name') $val = str_replace('@ ', '', str_replace('CPU ', '', str_replace('Quad-Core ', '', str_replace('Processor ', '', str_replace('(tm)', '', str_replace('(R)', '', $val))))));
+                            if (preg_match("/$match/i", $key)) $sys_info[sprintf('cpu%s', $k != 'name' ? '_' . $k : '')] = $k == 'cores' ? $val + 1 : $val;
+                        }
                     }
                 }
             }
-        }
-        $sys_info['hostname'] = trim(shell_exec('hostname'));
-        if (preg_match('/Mem:\s+([0-9]+)\s+([0-9]+)\s+([0-9]+)/', shell_exec('free -m'), $m)) {
-            $mb = $m[1]*1;
-            $sys_info['memory_mb'] = round($m[1]);
-            $sys_info['memory_gb'] = round($m[1]/1024);
-        }
-        $issue = file_get_contents('/etc/issue');
-        foreach(explode("\n", $issue) as $line) {
-            if (!isset($attr) && trim($line)) {
-                $attr = trim($line);
-                break;
+            $sys_info['hostname'] = trim(shell_exec('hostname'));
+            if (preg_match('/Mem:\s+([0-9]+)\s+([0-9]+)\s+([0-9]+)/', shell_exec('free -m'), $m)) {
+                $mb = $m[1]*1;
+                $sys_info['memory_mb'] = round($m[1]);
+                $sys_info['memory_gb'] = round($m[1]/1024);
             }
-        }
-        // remove superfluous information
-        if ($attr) {
-            $attr = str_replace('(\l).', '', $attr);
-            $attr = str_replace('\n', '', $attr);
-            $attr = str_replace('\l', '', $attr);
-            $attr = str_replace('\r', '', $attr);
-            $attr = str_replace('Welcome to', '', $attr);
-            $sys_info['os_info'] = trim($attr);
+            $issue = file_get_contents('/etc/issue');
+            foreach(explode("\n", $issue) as $line) {
+                if (!isset($attr) && trim($line)) {
+                    $attr = trim($line);
+                    break;
+                }
+            }
+            // remove superfluous information
+            if ($attr) {
+                $attr = str_replace('(\l).', '', $attr);
+                $attr = str_replace('\n', '', $attr);
+                $attr = str_replace('\l', '', $attr);
+                $attr = str_replace('\r', '', $attr);
+                $attr = str_replace('Welcome to', '', $attr);
+                $sys_info['os_info'] = trim($attr);
+            }
         }
     }
     
@@ -1432,7 +1445,12 @@ abstract class BlockStorageTest {
    * @return int
    */
   public static function getCpuCount() {
-    return trim(shell_exec('nproc'))*1;
+    if (preg_match('/[Bb][Ss][Dd]/', shell_exec('uname -s'))) {
+      return trim(shell_exec('sysctl -n hw.ncpu'))*1;
+    }
+    else {
+      return trim(shell_exec('nproc'))*1;
+    }
   }
   
   /**
@@ -1453,8 +1471,8 @@ abstract class BlockStorageTest {
       }
     }
     if ($device && $removeNumericSuffix && preg_match('/[a-z]([0-9]+)$/', $device, $m)) $device = substr($device, 0, strlen($m[1])*-1);
-    
-    return $device;
+
+    return $device ? realpath($device) : $device;
   }
   
   /**
@@ -1548,28 +1566,34 @@ abstract class BlockStorageTest {
    */
   public static function getFreeSpace($target, $bytes=FALSE, $verbose=FALSE) {
     $device = self::getDevice($target);
-    
+    $freeSpace = NULL;
+
     if ($device == $target) {
-      $pieces = explode("\n", trim(shell_exec($cmd = sprintf('lsblk -n -o size -b %s', $target))));
-      if (isset($pieces[0]) && is_numeric($pieces[0])) {
-        $freeSpace = $pieces[0]*1;
-        if (!$bytes) $freeSpace /= 1048576;
+      if (preg_match('/[Bb][Ss][Dd]/', shell_exec('uname -s'))) {
+        $freeSpace = trim(shell_exec(($cmd = sprintf('diskinfo -v  %s |grep bytes |cut -w -f 2', $target))))*1;
       }
+      else {
+        $pieces = explode("\n", trim(shell_exec($cmd = sprintf('lsblk -n -o size -b %s', $target))));
+        if (isset($pieces[0]) && is_numeric($pieces[0])) {
+          $freeSpace = $pieces[0]*1;
+        }
+      }
+      if ($freeSpace && !$bytes) $freeSpace /= 1048576;
     }
     else {
       $df = self::df($target, array('B' => 'M'));
       if (is_numeric($freeSpace = $df && isset($df['avail']) ? substr($df['avail'], 0, -1)*1 : NULL)) {
         if (file_exists($file = sprintf('%s/%s', $target, self::BLOCK_STORAGE_TEST_FILE_NAME))) $freeSpace += round((filesize($file)/1024)/1024);
-        if ($bytes) $freeSpace *= 1048576; 
+        if ($bytes) $freeSpace *= 1048576;
       }
     }
-    
+
     if ($freeSpace) print_msg(sprintf('Target %s has %s MB free space', $target, $bytes ? round($freeSpace/1048576) : $freeSpace), $verbose, __FILE__, __LINE__);
     else {
       $freeSpace = NULL;
       print_msg(sprintf('Unable to get free space for target %s', $target), $verbose, __FILE__, __LINE__, TRUE);
     }
-    
+
     return $freeSpace;
   }
   
@@ -1823,7 +1847,7 @@ abstract class BlockStorageTest {
         'fio' => 'fio',
         'fio_options' => array(
             'direct' => TRUE,
-            'ioengine' => 'libaio',
+            'ioengine' => preg_match('/[Bb][Ss][Dd]/', shell_exec('uname -s')) ? 'posixaio' : 'libaio',
             'refill_buffers' => FALSE,
             'scramble_buffers' => TRUE,
             'random_generator' => 'tausworthe64'
@@ -2089,16 +2113,27 @@ abstract class BlockStorageTest {
    */
   public static function isRotational($target) {
     $rotational = NULL;
-    
-    foreach(array(TRUE, FALSE) as $removeNumericSuffix) {
-      if (($device = self::getDevice($target, $removeNumericSuffix)) && 
-          file_exists($file = sprintf('/sys/block/%s/queue/rotational', basename($device)))) {
-        $rotational = trim(file_get_contents($file)) == '1';
-        break;
+
+    if (preg_match('/[Bb][Ss][Dd]/', shell_exec('uname -s'))) {
+      $rpm = trim(shell_exec($cmd = sprintf('diskinfo -v  %s |grep RPM |cut -w -f 2', $target)));
+      if (!empty($rpm) && is_numeric($rpm)) {
+        $rotational = ($rpm*1 != 0 ? TRUE : FALSE);
+      }
+      else {
+        print_msg(sprintf('Unable to check if %s is rotational', $target), TRUE, __FILE__, __LINE__);
       }
     }
-    if ($rotational === NULL) print_msg(sprintf('Unable to check if %s is rotational because file %s does not exist', isset($device) ? $device : $target, isset($file) ? $file : 'NA'), TRUE, __FILE__, __LINE__);
-    
+    else {
+      foreach(array(TRUE, FALSE) as $removeNumericSuffix) {
+        if (($device = self::getDevice($target, $removeNumericSuffix)) &&
+            file_exists($file = sprintf('/sys/block/%s/queue/rotational', basename($device)))) {
+          $rotational = trim(file_get_contents($file)) == '1';
+          break;
+        }
+      }
+      if ($rotational === NULL) print_msg(sprintf('Unable to check if %s is rotational because file %s does not exist', isset($device) ? $device : $target, isset($file) ? $file : 'NA'), TRUE, __FILE__, __LINE__);
+    }
+
     return $rotational;
   }
   
@@ -2198,6 +2233,7 @@ abstract class BlockStorageTest {
     $nopurgeIgnore = isset($this->options['nopurge_ignore']) && $this->options['nopurge_ignore'];
     $nosecureerase = isset($this->options['nosecureerase']) && $this->options['nosecureerase'];
     $nvmeformat = isset($this->options['nvmeformat']) && $this->options['nvmeformat']!==NULL;
+    $nosanitize = isset($this->options['nosanitize']) && $this->options['nosanitize'];
     $notrim = isset($this->options['notrim']) && $this->options['notrim'];
     $nozerofill = isset($this->options['nozerofill']) && $this->options['nozerofill'];
     $nozerofillNonRotational = isset($this->options['nozerofill_non_rotational']) && $this->options['nozerofill_non_rotational'];
@@ -2212,6 +2248,7 @@ abstract class BlockStorageTest {
         $purged = FALSE;
         $volume = self::getVolume($target);
         $rotational = self::isRotational($target);
+        $bsd = (preg_match('/[Bb][Ss][Dd]/', shell_exec('uname -s')));
         print_msg(sprintf('Attempting to purge %srotational target %s with --nosecureerase=%d; --notrim=%d; --nozerofill=%d', $rotational ? '' : 'non-', $target, $nosecureerase ? '1' : '0', $notrim ? '1' : '0', $nozerofill ? '1' : '0'), $this->verbose, __FILE__, __LINE__);
         // try ATA secure erase
         if ($this->deviceTargets && !$nosecureerase) {
@@ -2254,7 +2291,21 @@ abstract class BlockStorageTest {
           }
         }
         else if (!$purged) print_msg(sprintf('TRIM not attempted for target %s because %s', $target, $notrim ? '--notrim argument was specified' : 'device is rotational'), $this->verbose, __FILE__, __LINE__);
-        
+
+        // next try sanitize
+        if (!$purged && !$nosanitize && $bsd) {
+          $cmd = sprintf("camcontrol sanitize %s -y -a block >/dev/null 2>&1; echo $?", $target);
+          print_msg(sprintf('Attempting Sanitize for volume %s using command %s', $volume, $cmd), $this->verbose, __FILE__, __LINE__);
+          $ecode = trim(exec($cmd));
+          if ($ecode > 0) print_msg(sprintf('Sanitize not supported or failed for target %s (exit code %d)', $target, $ecode), $this->verbose, __FILE__, __LINE__);
+          else {
+            print_msg(sprintf('Sanitize successful for target %s', $target), $this->verbose, __FILE__, __LINE__);
+            $this->purgeMethods[$target] = 'sanitize';
+            $purged = TRUE;
+          }
+        }
+        else if (!$purged) print_msg(sprintf('Sanitize not attempted for target %s because %s', $target, $nosanitize ? '--nosanitize argument was specified' : 'Not implemented on this OS'), $this->verbose, __FILE__, __LINE__);
+
         // finally try zero filling
         if (!$purged && !$nozerofill && (!$nozerofillNonRotational || $rotational)) {
           $size = self::getFreeSpace($target);
