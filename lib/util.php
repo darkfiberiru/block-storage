@@ -609,10 +609,10 @@ function get_sys_info() {
   if (!is_array($sys_info)) {
 	$sys_info = array();
 	if  (preg_match('/[Bb][Ss][Dd]/', shell_exec('uname -s'))) {
-		$sysinfo['cpu'] = shell_exec("sysctl -n hw.model");
-		$sysinfo['cpu_cache'] = 0;
-		$sysinfo['cpu_cores'] = shell_exec("sysctl -n hw.ncpu");
-		$sysinfo['cpu_speed'] = shell_exec("sysctl -n dev.cpu.0.freq");
+		$sys_info['cpu'] = shell_exec("sysctl -n hw.model");
+		$sys_info['cpu_cache'] = 0;
+		$sys_info['cpu_cores'] = shell_exec("sysctl -n hw.ncpu");
+		$sys_info['cpu_speed'] = shell_exec("sysctl -n dev.cpu.0.freq");
 		$sys_info['hostname'] = trim(shell_exec('hostname'));
 		$memkb = shell_exec("sysctl -n hw.physmem");
 		$sys_info['memory_mb'] = round($memkb/1024/1024);

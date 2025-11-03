@@ -1591,9 +1591,9 @@ isset($options['wkhtml_xvfb']) ? 'xvfb-run ' : '', $options['font_size']);
   public static function isRotational($target) {
     $rotational = NULL;
     if  (preg_match('/[Bb][Ss][Dd]/', shell_exec('uname -s'))) {
-      $rpm = shell_exec($cmd = sprintf('diskinfo -v  %s |grep RPM |cut -w -f 2', $target));
+      $rpm = trim(shell_exec($cmd = sprintf('diskinfo -v  %s |grep RPM |cut -w -f 2', $target)));
       if (!empty($rpm)) {
-	      $rotational = ($rpm != 0 ? TRUE: FALSE);
+	      $rotational = ((int)$rpm != 0 ? TRUE: FALSE);
       }
       else {
         print_msg(sprintf('Unable to check if %s is rotational', isset($device) ? $device : $target), TRUE, __FILE__, __LINE__);
@@ -1747,11 +1747,11 @@ isset($options['wkhtml_xvfb']) ? 'xvfb-run ' : '', $options['font_size']);
         }
         else if (!$purged) print_msg(sprintf('TRIM not attempted for target %s because %s', $target, $notrim ? '--notrim argument was specified' : 'device is rotational'), $this->verbose, __FILE__, __LINE__);
 	
-	// next try sanitize 
+	// next try sanitize
         if (!$purged && !$nosanitize && $bsd ) {
           $cmd = sprintf("camcontrol sanitize %s -y -a block", $target);
           print_msg(sprintf('Attempting Sanitize for volume %s using command %s', $volume, $cmd), $this->verbose, __FILE__, __LINE__);
-          $ecode = trim(exec($cmd));
+          exec($cmd . ' 2>&1', $output, $ecode);
           if ($ecode > 0) print_msg(sprintf('Sanitize not supported or failed for target %s (exit code %d)', $target, $ecode), $this->verbose, __FILE__, __LINE__);
           else {
             print_msg(sprintf('Sanitize successful for target %s', $target), $this->verbose, __FILE__, __LINE__);
