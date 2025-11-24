@@ -1269,7 +1269,7 @@ isset($options['wkhtml_xvfb']) ? 'xvfb-run ' : '', $options['font_size']);
       'highcharts3d_js_url' => 'http://code.highcharts.com/highcharts-3d.js',
       'jquery_url' => 'http://code.jquery.com/jquery-2.1.0.min.js',
       'meta_compute_service' => 'Not Specified',
-      'meta_cpu' => $sysInfo['cpu'],
+      'meta_cpu' => isset($sysInfo['cpu']) ? $sysInfo['cpu'] : 'Unknown',
       'meta_instance_id' => 'Not Specified',
       'meta_memory' => $sysInfo['memory_gb'] > 0 ? $sysInfo['memory_gb'] . ' GB' : $sysInfo['memory_mb'] . ' MB',
       'meta_os' => $sysInfo['os_info'],
@@ -1279,6 +1279,7 @@ isset($options['wkhtml_xvfb']) ? 'xvfb-run ' : '', $options['font_size']);
       'oio_per_thread' => 64,
       'output' => trim(shell_exec('pwd')),
       'precondition_passes' => 2,
+      'precondition_time' => 0,
       'ss_max_rounds' => 25,
       'ss_verification' => 10,
       'test' => array('iops'),
@@ -1749,14 +1750,72 @@ isset($options['wkhtml_xvfb']) ? 'xvfb-run ' : '', $options['font_size']);
 	
 	// next try sanitize
         if (!$purged && !$nosanitize && $bsd ) {
-          $cmd = sprintf("camcontrol sanitize %s -y -a block", $target);
-          print_msg(sprintf('Attempting Sanitize for volume %s using command %s', $volume, $cmd), $this->verbose, __FILE__, __LINE__);
-          exec($cmd . ' 2>&1', $output, $ecode);
-          if ($ecode > 0) print_msg(sprintf('Sanitize not supported or failed for target %s (exit code %d)', $target, $ecode), $this->verbose, __FILE__, __LINE__);
+          // Detect drive type (ATA/SATA vs SCSI/SAS)
+          $is_ada = preg_match('/\/ada\d+$/', $target);  // ATA/SATA drives (ada0, ada1, etc.)
+          $is_da = preg_match('/\/da\d+$/', $target);    // SCSI/SAS drives (da0, da1, etc.)
+
+          $sanitize_supported = FALSE;
+
+          // Check if sanitize is supported
+          if ($is_ada) {
+            // For ATA/SATA drives, check with camcontrol identify
+            print_msg(sprintf('Checking sanitize support for ATA/SATA drive %s', $target), $this->verbose, __FILE__, __LINE__);
+            exec(sprintf('camcontrol identify %s 2>&1', $target), $id_output, $id_ecode);
+            $id_output_str = is_array($id_output) ? implode("\n", $id_output) : $id_output;
+            // Look for "sanitize" feature in the output (e.g., "sanitize           yes     no")
+            if (preg_match('/^sanitize\s+yes/im', $id_output_str)) {
+              $sanitize_supported = TRUE;
+              print_msg(sprintf('Sanitize feature detected for %s', $target), $this->verbose, __FILE__, __LINE__);
+            }
+            else {
+              print_msg(sprintf('Sanitize feature not detected for %s', $target), $this->verbose, __FILE__, __LINE__);
+            }
+          }
+          else if ($is_da) {
+            // For SCSI/SAS drives, try a dry-run test
+            print_msg(sprintf('Checking sanitize support for SCSI/SAS drive %s (attempting dry-run)', $target), $this->verbose, __FILE__, __LINE__);
+            // Try block erase with a test to see if it's supported (some versions support -n flag)
+            exec(sprintf('camcontrol sanitize %s -a block -n 2>&1', $target), $test_output, $test_ecode);
+            $test_output_str = is_array($test_output) ? implode("\n", $test_output) : $test_output;
+
+            // If the dry-run isn't supported, assume sanitize might work and try it
+            // (We'll catch the error during actual execution)
+            if (!preg_match('/invalid.*option|unknown.*option/i', $test_output_str)) {
+              if (!preg_match('/not supported|not available|error/i', $test_output_str)) {
+                $sanitize_supported = TRUE;
+                print_msg(sprintf('Sanitize appears supported for %s', $target), $this->verbose, __FILE__, __LINE__);
+              }
+              else {
+                print_msg(sprintf('Sanitize not supported for %s based on test', $target), $this->verbose, __FILE__, __LINE__);
+              }
+            }
+            else {
+              // -n flag not supported, try actual command (will error safely if not supported)
+              $sanitize_supported = TRUE;
+              print_msg(sprintf('Sanitize support unknown for %s, will attempt actual command', $target), $this->verbose, __FILE__, __LINE__);
+            }
+          }
+
+          if ($sanitize_supported) {
+            $cmd = sprintf("camcontrol sanitize %s -y -a block", $target);
+            print_msg(sprintf('Attempting Sanitize for volume %s using command %s', $volume, $cmd), $this->verbose, __FILE__, __LINE__);
+            exec($cmd . ' 2>&1', $output, $ecode);
+            $output_str = is_array($output) ? implode("\n", $output) : $output;
+            // Check for error messages in camcontrol output (prioritizes catching all errors,
+            // may have false positives on phrases like "without error", but camcontrol output is terse)
+            $has_error = preg_match('/\b(error|fail(ed|ure)?|unable|unsupported|not supported)\b/i', $output_str);
+
+            if ($ecode > 0 || $has_error) {
+              print_msg(sprintf('Sanitize not supported or failed for target %s (exit code %d)', $target, $ecode), $this->verbose, __FILE__, __LINE__);
+            }
+            else {
+              print_msg(sprintf('Sanitize successful for target %s', $target), $this->verbose, __FILE__, __LINE__);
+              $this->purgeMethods[$target] = 'sanitize';
+              $purged = TRUE;
+            }
+          }
           else {
-            print_msg(sprintf('Sanitize successful for target %s', $target), $this->verbose, __FILE__, __LINE__);
-            $this->purgeMethods[$target] = 'sanitize';
-            $purged = TRUE;
+            print_msg(sprintf('Sanitize not supported for target %s', $target), $this->verbose, __FILE__, __LINE__);
           }
         }
         else if (!$purged) print_msg(sprintf('Sanitize not attempted for target %s because %s', $target, $nosanitize ? '--nosanitize argument was specified' : 'Not implemented on this OS'), $this->verbose, __FILE__, __LINE__);

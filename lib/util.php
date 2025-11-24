@@ -609,7 +609,8 @@ function get_sys_info() {
   if (!is_array($sys_info)) {
 	$sys_info = array();
 	if  (preg_match('/[Bb][Ss][Dd]/', shell_exec('uname -s'))) {
-		$sys_info['cpu'] = shell_exec("sysctl -n hw.model");
+		$sys_info['cpu'] = trim(shell_exec("sysctl -n hw.model"));
+		if (empty($sys_info['cpu'])) $sys_info['cpu'] = 'Unknown';
 		$sys_info['cpu_cache'] = 0;
 		$sys_info['cpu_cores'] = shell_exec("sysctl -n hw.ncpu");
 		$sys_info['cpu_speed'] = shell_exec("sysctl -n dev.cpu.0.freq");
