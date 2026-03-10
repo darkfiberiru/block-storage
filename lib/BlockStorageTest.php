@@ -723,13 +723,13 @@ abstract class BlockStorageTest {
         foreach($settings as $key => $setting) {
           // special settings
           if (in_array($key, array('height', 'lines', 'nogrid', 'nokey', 'nolinespoints', 'xLogscale', 'xMin', 'xMax', 'xTics', 'xFloatPrec', 'yFloatPrec', 'yLogscale', 'yMin', 'yMax', 'yTics'))) continue;
-          fwrite($fp, "${setting}\n");
+          fwrite($fp, "{$setting}\n");
         }
       }
       fwrite($fp, "set autoscale keepfix\n");
       fwrite($fp, "set decimal locale\n");
-      fwrite($fp, "set format y \"%'10.${yFloatPrec}f\"\n");
-      fwrite($fp, "set format x \"%'10.${xFloatPrec}f\"\n");
+      fwrite($fp, "set format y \"%'10.{$yFloatPrec}f\"\n");
+      fwrite($fp, "set format x \"%'10.{$xFloatPrec}f\"\n");
       if ($xlabel) fwrite($fp, sprintf("set xlabel \"%s\"\n", $xlabel));
       if (isset($settings['xLogscale'])) {
         if (!isset($settings['xMin'])) $xMin = self::adjustLogScale($xMin, TRUE);
@@ -800,18 +800,6 @@ abstract class BlockStorageTest {
       }
       else {
         print_msg(sprintf('Generated line chart %s successfully', $img), $this->verbose, __FILE__, __LINE__);
-        // attempt to convert to PNG using wkhtmltoimage
-        if (self::wkhtmltopdfInstalled()) {
-          $cmd = sprintf('%swkhtmltoimage %s %s >/dev/null 2>&1', isset($this->options['wkhtml_xvfb']) ? 'xvfb-run ' : '', $img, $png = str_replace('.svg', '.png', $img));
-          $ecode = trim(exec($cmd));
-          sleep(1);
-          if (!file_exists($png) || !filesize($png)) print_msg(sprintf('Unable to convert SVG image %s to PNG %s (exit code %d)', $img, $png, $ecode), $this->verbose, __FILE__, __LINE__, TRUE);
-          else {
-            exec(sprintf('rm -f %s', $img));
-            print_msg(sprintf('SVG image %s converted to PNG successfully - PNG will be used in report', basename($img)), $this->verbose, __FILE__, __LINE__);
-            $img = $png;
-          }
-        }
         // return full image tag
         if ($html) $chart = sprintf('<img alt="%s" class="plot" src="%s" />', $this->getSubtitle($section), basename($img));
         else $chart = basename($img);
@@ -949,8 +937,7 @@ abstract class BlockStorageTest {
         exec(sprintf('cd %s; zip %s *; mv %s %s', $tdir, basename($zip), basename($zip), $dir));
         if (!isset($options['nopdfreport']) || !$options['nopdfreport']) {
           // generate PDF report
-          $cmd = sprintf('cd %s; chrome --headless --disable-gpu --print-to-pdf=report.pdf index.html >/dev/null 2>&1; echo $?', $tdir,
-isset($options['wkhtml_xvfb']) ? 'xvfb-run ' : '', $options['font_size']);
+          $cmd = sprintf('cd %s; chrome --headless --disable-gpu --print-to-pdf=report.pdf index.html >/dev/null 2>&1; echo $?', $tdir);
           $ecode = trim(exec($cmd));
           sleep(1);
           if ($ecode > 0) print_msg(sprintf('Failed to create PDF report'), $verbose, __FILE__, __LINE__, TRUE);
@@ -1052,9 +1039,9 @@ isset($options['wkhtml_xvfb']) ? 'xvfb-run ' : '', $options['font_size']);
     if (is_array($targetDesc)) $targetDesc = implode(', ', count($targetDesc) > 8 ? array_merge(array_slice($targetDesc, 0, 4), array('...'), array_slice($targetDesc, -4)) : $targetDesc);
     $params = array(
       'Storage Config' => $this->options['meta_storage_config'] . (isset($this->options['meta_host_cache']) ? sprintf(' (%s host cache enabled)', $this->options['meta_host_cache']) : '') . (isset($this->options['meta_encryption']) ? ' (w/encryption)' : '') . (isset($this->options['meta_burst']) ? ' (w/burst)' : '') . (isset($this->options['meta_piops']) ? ' (' . $this->options['meta_piops'] . ' PIOPS)' : '') . (isset($this->options['meta_pthroughput']) ? ' (' . $this->options['meta_pthroughput'] . ' PMBps)' : ''),
-      "# ${t}s" => count($this->options['target']),
-      "${t}s" => $targetDesc,
-      "${t} Capacities" => $capacities,
+      "# {$t}s" => count($this->options['target']),
+      "{$t}s" => $targetDesc,
+      "{$t} Capacities" => $capacities,
       'Purge Methods' => $purge,
       'Volume Info' => $volInfo,
       'Drive Model' => isset($this->options['meta_drive_model']) ? $this->options['meta_drive_model'] : '',
@@ -1363,8 +1350,7 @@ isset($options['wkhtml_xvfb']) ? 'xvfb-run ' : '', $options['font_size']);
       'v' => 'verbose',
       'wd_test_duration:',
       'wd_sleep_between:',
-      'wd_sleep_between_size:',
-      'wkhtml_xvfb'
+      'wd_sleep_between_size:'
     );
     $options = parse_args($opts, array('skip_blocksize', 'skip_workload', 'target', 'test'));
     $verbose = isset($options['verbose']) && $options['verbose'];
@@ -1592,13 +1578,13 @@ isset($options['wkhtml_xvfb']) ? 'xvfb-run ' : '', $options['font_size']);
   public static function isRotational($target) {
     $rotational = NULL;
     if  (preg_match('/[Bb][Ss][Dd]/', shell_exec('uname -s'))) {
-      $rpm = trim(shell_exec($cmd = sprintf('diskinfo -v  %s |grep RPM |cut -w -f 2', $target)));
-      if (!empty($rpm)) {
-	      $rotational = ((int)$rpm != 0 ? TRUE: FALSE);
+      $rpm = trim(shell_exec($cmd = sprintf('diskinfo -v  %s 2>/dev/null |grep RPM |cut -w -f 2', $target)));
+      if ($rpm !== '' && $rpm !== NULL) {
+        $rotational = ((int)$rpm != 0 ? TRUE: FALSE);
       }
       else {
         print_msg(sprintf('Unable to check if %s is rotational', isset($device) ? $device : $target), TRUE, __FILE__, __LINE__);
-      } 
+      }
     }
     else { 
       foreach(array(TRUE, FALSE) as $removeNumericSuffix) {
@@ -1834,7 +1820,6 @@ isset($options['wkhtml_xvfb']) ? 'xvfb-run ' : '', $options['font_size']);
             print_msg(sprintf('Attempting to zero fill target %s with %d MB. This may take a while...', $target, $size), $this->verbose, __FILE__, __LINE__);
             $cmd = sprintf('dd if=/dev/zero of=%s bs=1M count=%d >/dev/null 2>&1; echo $?', $file = $target . ($this->volumeTargets ? '/'. self::BLOCK_STORAGE_TEST_FILE_NAME : ''), $size);
             $ecode = trim(exec($cmd));
-            print_msg( sprintf('dd if=/dev/zero of=%s bs=1M count=%d >/dev/null 2>&1; echo $?', $file = $target . ($this->volumeTargets ? '/'. self::BLOCK_STORAGE_TEST_FILE_NAME : ''), $size), __FILE__, __LINE__);
             // delete zero file from volume type targets
             if ($this->volumeTargets) {
               print_msg(sprintf('Removing temporary zero fill file %s', $file), $this->verbose, __FILE__, __LINE__);
@@ -1897,12 +1882,9 @@ isset($options['wkhtml_xvfb']) ? 'xvfb-run ' : '', $options['font_size']);
    *   gnuplot     Generates graphs per the SNIA test specification. These graphs
    *               are used in the PDF report
    *   hdparm      Used for ATA secure erase (when supported)
-   *   util-linux  For TRIM operations using `blkdiscard` and `fstrim` (when 
+   *   util-linux  For TRIM operations using `blkdiscard` and `fstrim` (when
    *               supported). Not required if test targets are rotational
-   *   wkhtmltopdf Generates PDF version of report - download from 
-   *               http://wkhtmltopdf.org
-   *   xvfb-run    Allows wkhtmltopdf to be run in headless mode (required if 
-   *               --nopdfreport is not set and --wkhtml_xvfb is set)
+   *   chrome      Headless Chrome/Chromium for PDF report generation
    *   zip         Archives HTML test report into a single zip file
    * returns an array containing the missing dependencies (array is empty if 
    * all dependencies are valid)
@@ -1916,8 +1898,7 @@ isset($options['wkhtml_xvfb']) ? 'xvfb-run ' : '', $options['font_size']);
       $dependencies['gnuplot'] = 'gnuplot';
       $dependencies['zip'] = 'zip';
       if (!isset($options['nopdfreport']) || !$options['nopdfreport']) {
-        $dependencies['wkhtmltopdf'] = 'wkhtmltopdf';
-        if (isset($options['wkhtml_xvfb'])) $dependencies['xvfb-run'] = 'xvfb';
+        $dependencies['chrome'] = 'chrome';
       }
     }
     // ATA secure erase requires hdparm
@@ -2061,17 +2042,7 @@ isset($options['wkhtml_xvfb']) ? 'xvfb-run ' : '', $options['font_size']);
   }
   
   /**
-   * returns TRUE if wkhtmltopdf is installed, FALSE otherwise
-   * @return boolean
-   */
-  public final static function wkhtmltopdfInstalled() {
-    $ecode = trim(exec('which wkhtmltopdf; echo $?'));
-    return $ecode == 0;
-  }
-  
-  
-  /**
-   * Performs workload dependent preconditioning - this method must be 
+   * Performs workload dependent preconditioning - this method must be
    * implemented by sub-classes. It should return one of the following 
    * values:
    *   TRUE:  preconditioning successful and steady state achieved

@@ -98,7 +98,7 @@ class BlockStorageTestThroughput extends BlockStorageTest {
           $coords = array();
           foreach(array_keys($this->fio['wdpc']) as $i) {
             $job = isset($this->fio['wdpc'][$i]['jobs'][0]['jobname']) ? $this->fio['wdpc'][$i]['jobs'][0]['jobname'] : NULL;
-            if ($job && preg_match("/^x([0-9]+)\-${workload}\-${bs}\-/", $job, $m) && isset($this->fio['wdpc'][$i]['jobs'][0][$key]['bw'])) {
+            if ($job && preg_match("/^x([0-9]+)\-{$workload}\-{$bs}\-/", $job, $m) && isset($this->fio['wdpc'][$i]['jobs'][0][$key]['bw'])) {
               $round = $m[1]*1;
               $bw = round($this->fio['wdpc'][$i]['jobs'][0][$key]['bw']/1024, 2);
               $label = sprintf('BS=%s', $bs);
@@ -113,7 +113,7 @@ class BlockStorageTestThroughput extends BlockStorageTest {
           $coords = array();
           $bandwidth = array();
           foreach(array_keys($jobs) as $job) {
-            if (preg_match("/^x([0-9]+)\-0_100\-${bs}\-/", $job, $m) && isset($jobs[$job]['write']['bw'])) {
+            if (preg_match("/^x([0-9]+)\-0_100\-{$bs}\-/", $job, $m) && isset($jobs[$job]['write']['bw'])) {
               if (!isset($coords['Throughput (MB/s)'])) $coords['Throughput (MB/s)'] = array();
               $round = $m[1]*1;
               $bw = round($jobs[$job]['write']['bw']/1024, 2);
@@ -157,7 +157,7 @@ class BlockStorageTestThroughput extends BlockStorageTest {
           $workloads = array();
           $table = array();
           foreach(array_keys($jobs) as $job) {
-            if (preg_match("/^x[0-9]+\-([0-9]+)_([0-9]+)\-${bs}\-/", $job, $m) && (isset($jobs[$job]['read']['bw']) || isset($jobs[$job]['write']['bw']))) {
+            if (preg_match("/^x[0-9]+\-([0-9]+)_([0-9]+)\-{$bs}\-/", $job, $m) && (isset($jobs[$job]['read']['bw']) || isset($jobs[$job]['write']['bw']))) {
               $rw = $m[1] . '/' . $m[2];
               if (!in_array($rw, $workloads)) $workloads[] = $rw;
               if (!isset($table[$bs])) $table[$bs] = array();
@@ -305,7 +305,7 @@ class BlockStorageTestThroughput extends BlockStorageTest {
       $bs = $this->bs;
       $jobs = $this->getSteadyStateJobs();
       foreach(array_keys($jobs) as $job) {
-        if (preg_match("/^x[0-9]+\-([0-9]+)_([0-9]+)\-${bs}\-/", $job, $m) && (isset($jobs[$job]['read']['bw']) || isset($jobs[$job]['write']['bw']))) {
+        if (preg_match("/^x[0-9]+\-([0-9]+)_([0-9]+)\-{$bs}\-/", $job, $m) && (isset($jobs[$job]['read']['bw']) || isset($jobs[$job]['write']['bw']))) {
           $key = sprintf('%s_%s_%s', $bs, $m[1], $m[2]);
           if (!isset($metrics[$key])) $metrics[$key] = array();
           $metrics[$key][] = round(($jobs[$job]['read']['bw'] + $jobs[$job]['write']['bw'])/1024, 2);

@@ -183,8 +183,8 @@ ARGUMENTS:
                             
 --nojson                    Don't generate JSON result or fio output files
 
---nopdfreport               Don't generate PDF version of test report - 
-                            report.pdf. (wkhtmltopdf dependency removed if 
+--nopdfreport               Don't generate PDF version of test report -
+                            report.pdf. (chrome dependency removed if
                             specified)
 
 --noprecondition            Don't perform the default 2X 128K sequential 
@@ -208,8 +208,8 @@ ARGUMENTS:
                             Use of random data for IO is a requirement of the 
                             SNIA test specification
 
---noreport                  Don't generate html or PDF test reports - 
-                            report.zip and report.pdf (gnuplot, wkhtmltopdf and
+--noreport                  Don't generate html or PDF test reports -
+                            report.zip and report.pdf (gnuplot, chrome and
                             zip dependencies removed if specified)
 
 --nosecureerase             Don't attempt to secure erase device targets prior 
@@ -446,12 +446,6 @@ ARGUMENTS:
                             useful for NFS volumes where size reported for the
                             volume may not accurate
                             
---wkhtml_xvfb               If set, wkhtmlto* commands will be prefixed with 
-                            xvfb-run (which is added as a dependency). This is
-                            useful when the wkhtml installation does not 
-                            support running in headless mode
-                            
-                            
 TEST ARTIFACTS
 Upon successful completion of testing, the following artifacts will be 
 produced in the working directory ([test] replaced with one of the test 
@@ -483,7 +477,7 @@ identifiers - e.g. report-iops.json):
                      addition, this archive contains source gnuplot scripts and 
                      data files for report graphs. Graphs are rendered in svg 
                       format
-  report.pdf         PDF version of the test report (wkhtmltopdf used to 
+  report.pdf         PDF version of the test report (headless Chrome used to
                      generate this version of the report)
                      
                      

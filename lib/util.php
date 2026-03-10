@@ -612,13 +612,13 @@ function get_sys_info() {
 		$sys_info['cpu'] = trim(shell_exec("sysctl -n hw.model"));
 		if (empty($sys_info['cpu'])) $sys_info['cpu'] = 'Unknown';
 		$sys_info['cpu_cache'] = 0;
-		$sys_info['cpu_cores'] = shell_exec("sysctl -n hw.ncpu");
-		$sys_info['cpu_speed'] = shell_exec("sysctl -n dev.cpu.0.freq");
+		$sys_info['cpu_cores'] = trim(shell_exec("sysctl -n hw.ncpu"));
+		$sys_info['cpu_speed'] = trim(shell_exec("sysctl -n dev.cpu.0.freq"));
 		$sys_info['hostname'] = trim(shell_exec('hostname'));
-		$memkb = shell_exec("sysctl -n hw.physmem");
+		$memkb = trim(shell_exec("sysctl -n hw.physmem"));
 		$sys_info['memory_mb'] = round($memkb/1024/1024);
 		$sys_info['memory_gb'] = round($memkb/1024/1024/1024);
-		$sys_info['os_info'] = shell_exec("uname -vUKi");
+		$sys_info['os_info'] = trim(shell_exec("uname -vUKi"));
         }
 	else {
 
@@ -744,7 +744,7 @@ function parse_args($opts, $arrayArgs=NULL, $paramPrefix='') {
      unset($options[$short]);
    }
    // check for environment variable
-   if (getenv("bm_param_${paramPrefix}${key}") !== FALSE && !isset($options[$key])) $options[$key] = getenv("bm_param_${paramPrefix}${key}");
+   if (getenv("bm_param_{$paramPrefix}{$key}") !== FALSE && !isset($options[$key])) $options[$key] = getenv("bm_param_{$paramPrefix}{$key}");
    if (!isset($options[$key]) && preg_match('/^meta_/', $key) && getenv('bm_' . str_replace('meta_', '', $key)) !== FALSE) $options[$key] = getenv('bm_' . str_replace('meta_', '', $key));
    // convert booleans
    if (isset($options[$key]) && !strpos($long, ':')) $options[$key] = $options[$key] === '0' ? FALSE : TRUE;
