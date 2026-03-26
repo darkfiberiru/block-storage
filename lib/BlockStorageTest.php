@@ -1758,28 +1758,11 @@ abstract class BlockStorageTest {
             }
           }
           else if ($is_da) {
-            // For SCSI/SAS drives, try a dry-run test
-            print_msg(sprintf('Checking sanitize support for SCSI/SAS drive %s (attempting dry-run)', $target), $this->verbose, __FILE__, __LINE__);
-            // Try block erase with a test to see if it's supported (some versions support -n flag)
-            exec(sprintf('camcontrol sanitize %s -a block -n 2>&1', $target), $test_output, $test_ecode);
-            $test_output_str = is_array($test_output) ? implode("\n", $test_output) : $test_output;
-
-            // If the dry-run isn't supported, assume sanitize might work and try it
-            // (We'll catch the error during actual execution)
-            if (!preg_match('/invalid.*option|unknown.*option/i', $test_output_str)) {
-              if (!preg_match('/not supported|not available|error/i', $test_output_str)) {
-                $sanitize_supported = TRUE;
-                print_msg(sprintf('Sanitize appears supported for %s', $target), $this->verbose, __FILE__, __LINE__);
-              }
-              else {
-                print_msg(sprintf('Sanitize not supported for %s based on test', $target), $this->verbose, __FILE__, __LINE__);
-              }
-            }
-            else {
-              // -n flag not supported, try actual command (will error safely if not supported)
-              $sanitize_supported = TRUE;
-              print_msg(sprintf('Sanitize support unknown for %s, will attempt actual command', $target), $this->verbose, __FILE__, __LINE__);
-            }
+            // For SCSI/SAS drives, attempt sanitize directly — no reliable dry-run exists
+            // (camcontrol sanitize has no dry-run flag; the actual command with -y will
+            // return non-zero and/or error output if sanitize is not supported)
+            $sanitize_supported = TRUE;
+            print_msg(sprintf('Will attempt sanitize for SCSI/SAS drive %s', $target), $this->verbose, __FILE__, __LINE__);
           }
 
           if ($sanitize_supported) {
@@ -1808,7 +1791,7 @@ abstract class BlockStorageTest {
         
         // finally try zero filling
         if (!$purged && !$nozerofill && (!$nozerofillNonRotational || $rotational)) {
-          $size = self::getFreeSpace($target,$bytes=TRUE);
+          $size = self::getFreeSpace($target);
           
           // adjust for active range and volume target free space buffer
           if ($this->options['active_range'] < 100) $size *= ($this->options['active_range'] * 0.01);
