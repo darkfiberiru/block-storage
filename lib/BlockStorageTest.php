@@ -1789,15 +1789,15 @@ abstract class BlockStorageTest {
         }
         else if (!$purged) print_msg(sprintf('Sanitize not attempted for target %s because %s', $target, $nosanitize ? '--nosanitize argument was specified' : 'Not implemented on this OS'), $this->verbose, __FILE__, __LINE__);
         
-        // finally try zero filling
-        if (!$purged && !$nozerofill && (!$nozerofillNonRotational || $rotational)) {
+        // finally try zero filling (skip for rotational/HDD targets — too slow and unnecessary)
+        if (!$purged && !$nozerofill && !$rotational) {
           $size = self::getFreeSpace($target);
-          
+
           // adjust for active range and volume target free space buffer
           if ($this->options['active_range'] < 100) $size *= ($this->options['active_range'] * 0.01);
           else if ($this->volumeTargets) $size -= self::BLOCK_STORAGE_TEST_FREE_SPACE_BUFFER;
           $size = round($size);
-          
+
           if ($size < 1) print_msg(sprintf('Target %s does not have sufficient space (%d MB) to accomodate free space buffer (%d MB)', $target, $size + self::BLOCK_STORAGE_TEST_FREE_SPACE_BUFFER, self::BLOCK_STORAGE_TEST_FREE_SPACE_BUFFER), $this->verbose, __FILE__, __LINE__, TRUE);
           else {
             print_msg(sprintf('Attempting to zero fill target %s with %d MB. This may take a while...', $target, $size), $this->verbose, __FILE__, __LINE__);
@@ -1813,13 +1813,18 @@ abstract class BlockStorageTest {
               print_msg(sprintf('Zero fill successful for target %s', $target), $this->verbose, __FILE__, __LINE__);
               $this->purgeMethods[$target] = 'zero';
               $purged = TRUE;
-            } 
+            }
           }
         }
-        else if (!$purged) print_msg(sprintf('Zero fill not attempted for target %s because %s', $target, $nozerofill ? '--nozerofill argument was specified' : ($nozerofillNonRotational && !$rotational ? '--nozerofill_non_rotational argument specified and target is non-rotational' : 'it is not a device')), $this->verbose, __FILE__, __LINE__);
+        else if (!$purged) print_msg(sprintf('Zero fill not attempted for target %s because %s', $target, $nozerofill ? '--nozerofill argument was specified' : ($rotational ? 'target is rotational (HDD) — zero fill skipped' : 'it is not a device')), $this->verbose, __FILE__, __LINE__);
         
         if ($purged) {
           print_msg(sprintf('Target %s purged successfully using %s', $target, $this->purgeMethods[$target]), $this->verbose, __FILE__, __LINE__);
+          $purgeCount++;
+        }
+        else if ($rotational) {
+          // HDDs: purge is not critical — TRIM/sanitize unsupported and zero-fill too slow
+          print_msg(sprintf('Target %s is rotational (HDD) — purge skipped, continuing without purge', $target), $this->verbose, __FILE__, __LINE__);
           $purgeCount++;
         }
         else print_msg(sprintf('Target %s could not be purged', $target), $this->verbose, __FILE__, __LINE__);
